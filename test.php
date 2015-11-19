@@ -1,6 +1,8 @@
 <?php
 
-// date_default_timezone_set('PRC');
+define('DS', DIRECTORY_SEPARATOR);
+define('ROOT_PATH', realpath(dirname(__FILE__)) . DS);
+
 class Test
 {
 	// static private $options = "hdrmp:s:l:c:";
@@ -11,6 +13,7 @@ class Test
 	
 	static function run()
 	{
+		self::spl_autoload_register();
 		swoole_set_process_name('lzm_Crontab');
 		self::load_config();
 		$run = true;
@@ -28,6 +31,17 @@ class Test
 	}
 	
 	/**
+     * 注册类库载入路径
+     */
+    static public function spl_autoload_register()
+    {
+        spl_autoload_register(function ($name) {
+            $file_path = ROOT_PATH . DS . $name . ".class.php";
+            include $file_path;
+        });
+    }
+	
+	/**
      *  注册定时任务
      */
     static protected function register_timer()
@@ -43,36 +57,16 @@ class Test
 	static function load_config()
 	{	
 		$time = time();
-        $config = include(dirname(__FILE__).'/config.php');
+        $config = include(ROOT_PATH.DS.'config.php');
         foreach ($config as $id => $task) {
 			// 先支持秒（, *） 这两种
-            $ret = self::_parse_cron_number($task["time"], 0, 59);
+            $ret = ParseCrontab::parse($task["time"], $time);
 			// 设置每秒的任务
 			foreach ($ret as $sec) {
 				self::$turntable[$sec][$id] = $task;
 			}
         }
 	}
-	
-	static protected function _parse_cron_number($s, $min, $max)
-    {
-        $result = array();
-        $v1 = explode(",", $s);
-        foreach ($v1 as $v2) {
-			// 增加-,/方式
-			$v3 = explode('/', $v2);
-			$step = empty($v3[1]) ? 1 : $v3[1];
-			$v4 = explode("-", $v3[0]);
-			
-			$_min = count($v4)==2 ? $v4[0] : ($v3[0] == "*" ? $min : $v3[0]);
-			$_max = count($v4)==2 ? $v4[1] : ($v3[0] == "*" ? $max : $v3[0]);
-            for ($i = $_min; $i <= $_max; $i += $step) {
-                $result[$i] = intval($i);
-            }
-        }
-        ksort($result);
-        return $result;
-    }
 	
 	static function do_something($interval)
 	{
@@ -82,23 +76,14 @@ class Test
 		if( !isset($tasks_arr[$current_sec])) {
 			return false;
 		}
+		
 		$tasks = $tasks_arr[$current_sec];
 		foreach ($tasks as $id => $task) {
-			self::$current_task = $task;
-			$process = new swoole_process(function($worker){ Test::run_process($worker); }, true);
-			$pid = $process->start();
+			(new Process)->create_process($task);
 		}
 
         return true;
 	}
-	
-	static function run_process(swoole_process $worker)
-	{
-		$task = self::$current_task;
-		$worker->exec($task['task']['parse'], $task['task']['ext']);
-	}
 }
-
-
 
 Test::run();
