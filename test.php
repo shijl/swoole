@@ -59,9 +59,13 @@ class Test
         $result = array();
         $v1 = explode(",", $s);
         foreach ($v1 as $v2) {
-			$step = 1;
-			$_min = ($v2 == "*") ? $min : $v2;
-			$_max = ($v2 == "*") ? $max : $v2;
+			// 增加-,/方式
+			$v3 = explode('/', $v2);
+			$step = empty($v3[1]) ? 1 : $v3[1];
+			$v4 = explode("-", $v3[0]);
+			
+			$_min = count($v4)==2 ? $v4[0] : ($v3[0] == "*" ? $min : $v3[0]);
+			$_max = count($v4)==2 ? $v4[1] : ($v3[0] == "*" ? $max : $v3[0]);
             for ($i = $_min; $i <= $_max; $i += $step) {
                 $result[$i] = intval($i);
             }
